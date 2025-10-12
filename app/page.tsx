@@ -3,8 +3,8 @@
 import { useRef, useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import ChatInterface from '../components/ChatInterface';
-import AuthModal from '../components/AuthModal';
 import { supabaseBlog, supabaseAuth, BlogCategory } from '../lib/supabase';
 import { Loader2, Send, Search, Edit2, Trash2, LogOut } from 'lucide-react';
 
@@ -24,13 +24,14 @@ interface BlogPost {
 }
 
 export default function Home() {
+  const router = useRouter();
   const editorRef = useRef<any>(null);
   const [activeTab, setActiveTab] = useState<'create' | 'manage'>('create');
 
   // 인증 상태
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
   // 포스팅 상태
   const [postTitle, setPostTitle] = useState('');
@@ -53,8 +54,9 @@ export default function Home() {
         setIsAuthenticated(true);
         setCurrentUser(session.user);
       } else {
-        setIsAuthModalOpen(true);
+        router.push('/login');
       }
+      setIsCheckingAuth(false);
     };
 
     checkAuth();
@@ -64,25 +66,15 @@ export default function Home() {
       if (session) {
         setIsAuthenticated(true);
         setCurrentUser(session.user);
-        setIsAuthModalOpen(false);
       } else {
         setIsAuthenticated(false);
         setCurrentUser(null);
-        setIsAuthModalOpen(true);
+        router.push('/login');
       }
     });
 
     return () => subscription.unsubscribe();
-  }, []);
-
-  // 로그아웃 핸들러
-  const handleLogout = async () => {
-    await supabaseAuth.auth.signOut();
-    await fetch('/api/auth/logout', { method: 'POST' });
-    setIsAuthenticated(false);
-    setCurrentUser(null);
-    setIsAuthModalOpen(true);
-  };
+  }, [router]);
 
   // 카테고리 가져오기
   useEffect(() => {
@@ -140,6 +132,24 @@ export default function Home() {
       return () => clearTimeout(timer);
     }
   }, [searchQuery, activeTab]);
+
+  // 로그아웃 핸들러
+  const handleLogout = async () => {
+    await supabaseAuth.auth.signOut();
+    await fetch('/api/auth/logout', { method: 'POST' });
+    setIsAuthenticated(false);
+    setCurrentUser(null);
+    router.push('/login');
+  };
+
+  // 인증 확인 중에는 로딩 표시
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   // 포스트 발행
   const handlePublishToBlog = async () => {
@@ -336,16 +346,6 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* 인증 모달 */}
-      <AuthModal
-        isOpen={isAuthModalOpen}
-        onClose={() => {}}
-        onSuccess={(session) => {
-          setIsAuthenticated(true);
-          setCurrentUser(session.user);
-        }}
-      />
-
       {/* 헤더 */}
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container max-w-7xl flex h-16 items-center justify-between">
