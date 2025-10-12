@@ -6,6 +6,14 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholde
 
 export const supabaseBlog = createClient(supabaseUrl, supabaseAnonKey);
 
+// 인증용 Supabase 클라이언트 (Auth 기능 포함)
+export const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+  }
+});
+
 // 타입 정의
 export interface BlogPost {
   id: number;

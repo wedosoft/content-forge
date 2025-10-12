@@ -3,9 +3,10 @@
 import { useRef, useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import ChatInterface from '../components/ChatInterface';
-import { supabaseBlog, BlogCategory } from '../lib/supabase';
-import { Loader2, Send, Search, Edit2, Trash2 } from 'lucide-react';
+import { supabaseBlog, supabaseAuth, BlogCategory } from '../lib/supabase';
+import { Loader2, Send, Search, Edit2, Trash2, LogOut } from 'lucide-react';
 
 // BlockNote AI 에디터를 동적으로 로드 (SSR 방지)
 const BlockNoteEditorWithAI = dynamic(
@@ -23,8 +24,14 @@ interface BlogPost {
 }
 
 export default function Home() {
+  const router = useRouter();
   const editorRef = useRef<any>(null);
   const [activeTab, setActiveTab] = useState<'create' | 'manage'>('create');
+
+  // 인증 상태
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
   // 포스팅 상태
   const [postTitle, setPostTitle] = useState('');
@@ -38,6 +45,36 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState('');
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
+
+  // 인증 상태 확인
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { session } } = await supabaseAuth.auth.getSession();
+      if (session) {
+        setIsAuthenticated(true);
+        setCurrentUser(session.user);
+      } else {
+        router.push('/login');
+      }
+      setIsCheckingAuth(false);
+    };
+
+    checkAuth();
+
+    // 인증 상태 변경 감지
+    const { data: { subscription } } = supabaseAuth.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        setIsAuthenticated(true);
+        setCurrentUser(session.user);
+      } else {
+        setIsAuthenticated(false);
+        setCurrentUser(null);
+        router.push('/login');
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [router]);
 
   // 카테고리 가져오기
   useEffect(() => {
@@ -95,6 +132,24 @@ export default function Home() {
       return () => clearTimeout(timer);
     }
   }, [searchQuery, activeTab]);
+
+  // 로그아웃 핸들러
+  const handleLogout = async () => {
+    await supabaseAuth.auth.signOut();
+    await fetch('/api/auth/logout', { method: 'POST' });
+    setIsAuthenticated(false);
+    setCurrentUser(null);
+    router.push('/login');
+  };
+
+  // 인증 확인 중에는 로딩 표시
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   // 포스트 발행
   const handlePublishToBlog = async () => {
@@ -316,6 +371,20 @@ export default function Home() {
               AI 리라이터
             </h1>
           </div>
+          {isAuthenticated && (
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-muted-foreground hidden md:inline">
+                {currentUser?.email}
+              </span>
+              <button
+                onClick={handleLogout}
+                className="px-3 py-1.5 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 text-sm flex items-center gap-2 font-medium"
+              >
+                <LogOut className="w-4 h-4" />
+                로그아웃
+              </button>
+            </div>
+          )}
         </div>
       </header>
 
