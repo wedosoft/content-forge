@@ -93,7 +93,8 @@ export default function ChatInterface({ editorRef }: ChatInterfaceProps) {
             id: `block_${index}`,
             text: textContent,
             type: block.type,
-            props: block.props || {}
+            props: block.props || {},
+            content: block.content || [] // 원본 content 보존 (스타일 포함)
           });
         }
       } else {
@@ -130,16 +131,33 @@ export default function ChatInterface({ editorRef }: ChatInterfaceProps) {
         // 텍스트 블록 (리스트 포함)
         const processedBlock = processedBlocks[processedIndex];
         if (processedBlock) {
-          newBlocks.push({
-            type: processedBlock.type,
-            props: originalBlock.props || {},
-            content: [
+          // 원본 content가 있으면 스타일을 보존하면서 텍스트만 교체
+          let newContent;
+          if (processedBlock.content && processedBlock.content.length > 0) {
+            // 원본 스타일 보존: 첫 번째 content 아이템의 스타일을 사용
+            const originalStyles = processedBlock.content[0]?.styles || {};
+            newContent = [
+              {
+                type: 'text',
+                text: processedBlock.text,
+                styles: originalStyles
+              }
+            ];
+          } else {
+            // 원본 content가 없으면 기본 스타일
+            newContent = [
               {
                 type: 'text',
                 text: processedBlock.text,
                 styles: {}
               }
-            ]
+            ];
+          }
+
+          newBlocks.push({
+            type: processedBlock.type,
+            props: originalBlock.props || {},
+            content: newContent
           });
           processedIndex++;
         }
@@ -148,6 +166,9 @@ export default function ChatInterface({ editorRef }: ChatInterfaceProps) {
 
     // 에디터 내용 업데이트
     editorRef.current.replaceBlocks(editorRef.current.document, newBlocks);
+
+    // 에디터 업데이트가 완전히 반영될 때까지 대기
+    await new Promise(resolve => setTimeout(resolve, 100));
   };
 
   // 리라이팅 처리
@@ -159,7 +180,9 @@ export default function ChatInterface({ editorRef }: ChatInterfaceProps) {
     try {
       // 에디터에서 콘텐츠 추출
       const { textBlocks, preservedElements } = extractTextBlocks();
-      
+
+      console.log(`[${action}] Extracted text blocks:`, textBlocks.map(b => ({ id: b.id, text: b.text.substring(0, 50) })));
+
       if (textBlocks.length === 0) {
         addMessage('error', '처리할 텍스트가 없습니다. 에디터에 텍스트를 입력해주세요.');
         return;
@@ -257,20 +280,24 @@ export default function ChatInterface({ editorRef }: ChatInterfaceProps) {
         {messages.map((message) => (
           <div
             key={message.id}
-            className={`p-3 rounded-lg max-w-[85%] ${
-              message.type === 'user'
-                ? 'bg-primary text-primary-foreground ml-auto'
-                : message.type === 'success'
-                ? 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200'
-                : message.type === 'error'
-                ? 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200'
-                : 'bg-muted text-foreground border'
-            }`}
+            className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
           >
-            <p className="text-sm">{message.content}</p>
-            <p className="text-xs opacity-70 mt-1">
-              {message.timestamp.toLocaleTimeString()}
-            </p>
+            <div
+              className={`p-3 rounded-lg max-w-[85%] ${
+                message.type === 'user'
+                  ? 'bg-primary text-primary-foreground'
+                  : message.type === 'success'
+                  ? 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200'
+                  : message.type === 'error'
+                  ? 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200'
+                  : 'bg-muted text-foreground border'
+              }`}
+            >
+              <p className="text-sm">{message.content}</p>
+              <p className="text-xs opacity-70 mt-1">
+                {message.timestamp.toLocaleTimeString()}
+              </p>
+            </div>
           </div>
         ))}
         <div ref={messagesEndRef} />

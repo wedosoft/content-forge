@@ -325,7 +325,18 @@ export default function Home() {
       <div className="border-b bg-background">
         <div className="container max-w-7xl flex gap-4">
           <button
-            onClick={() => setActiveTab('create')}
+            onClick={() => {
+              setActiveTab('create');
+              // 새 포스팅 탭으로 전환 시 초기화
+              setEditingPostId(null);
+              setPostTitle('');
+              setSelectedCategory('');
+              if (editorRef.current?.replaceBlocks) {
+                editorRef.current.replaceBlocks(editorRef.current.document, [
+                  { type: 'paragraph', content: '' }
+                ]);
+              }
+            }}
             className={`px-4 py-3 font-medium border-b-2 transition-colors ${
               activeTab === 'create'
                 ? 'border-primary text-primary'
