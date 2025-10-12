@@ -242,14 +242,14 @@ export default function ChatInterface({ editorRef }: ChatInterfaceProps) {
   };
 
   return (
-    <div className="flex flex-col h-full bg-gray-50 border-l">
+    <div className="flex flex-col h-full bg-card border rounded-lg shadow-sm">
       {/* 헤더 */}
-      <div className="p-4 border-b bg-white">
-        <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+      <div className="p-4 border-b">
+        <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
           <MessageCircle className="w-5 h-5" />
           AI 리라이터
         </h2>
-        <p className="text-sm text-gray-600 mt-1">텍스트를 선택하고 리라이팅을 요청하세요</p>
+        <p className="text-sm text-muted-foreground mt-1">텍스트를 선택하고 리라이팅을 요청하세요</p>
       </div>
 
       {/* 메시지 목록 */}
@@ -259,12 +259,12 @@ export default function ChatInterface({ editorRef }: ChatInterfaceProps) {
             key={message.id}
             className={`p-3 rounded-lg max-w-[85%] ${
               message.type === 'user'
-                ? 'bg-blue-500 text-white ml-auto'
+                ? 'bg-primary text-primary-foreground ml-auto'
                 : message.type === 'success'
-                ? 'bg-green-100 text-green-800'
+                ? 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200'
                 : message.type === 'error'
-                ? 'bg-red-100 text-red-800'
-                : 'bg-white text-gray-800 border'
+                ? 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200'
+                : 'bg-muted text-foreground border'
             }`}
           >
             <p className="text-sm">{message.content}</p>
@@ -277,12 +277,12 @@ export default function ChatInterface({ editorRef }: ChatInterfaceProps) {
       </div>
 
       {/* 빠른 액션 버튼 */}
-      <div className="p-4 border-t bg-white">
+      <div className="p-4 border-t">
         <div className="grid grid-cols-2 gap-2 mb-3">
           <button
             onClick={() => handleRewriteRequest('translate')}
             disabled={isProcessing}
-            className="flex items-center gap-2 p-2 text-sm bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 p-2 text-sm bg-primary/10 hover:bg-primary/20 text-primary rounded-md disabled:opacity-50 disabled:cursor-not-allowed font-medium"
           >
             <Globe className="w-4 h-4" />
             번역
@@ -293,41 +293,41 @@ export default function ChatInterface({ editorRef }: ChatInterfaceProps) {
             <button
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
               disabled={isProcessing}
-              className="w-full flex items-center justify-between gap-2 p-2 text-sm bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full flex items-center justify-between gap-2 p-2 text-sm bg-primary/10 hover:bg-primary/20 text-primary rounded-md disabled:opacity-50 disabled:cursor-not-allowed font-medium"
             >
               <span>✨ 스타일 변경</span>
               <ChevronDown className="w-4 h-4" />
             </button>
 
             {isDropdownOpen && (
-              <div className="absolute bottom-full left-0 right-0 mb-1 bg-white border rounded-lg shadow-lg z-10">
+              <div className="absolute bottom-full left-0 right-0 mb-1 bg-card border rounded-md shadow-lg z-10">
                 <button
                   onClick={() => handleStyleSelect('grammar')}
-                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 first:rounded-t-lg"
+                  className="w-full text-left px-3 py-2 text-sm hover:bg-accent first:rounded-t-md"
                 >
                   ✓ 맞춤법 교정
                 </button>
                 <button
                   onClick={() => handleStyleSelect('expand')}
-                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100"
+                  className="w-full text-left px-3 py-2 text-sm hover:bg-accent"
                 >
                   📝 내용 확장
                 </button>
                 <button
                   onClick={() => handleStyleSelect('simplify')}
-                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100"
+                  className="w-full text-left px-3 py-2 text-sm hover:bg-accent"
                 >
                   💡 쉽게 풀어쓰기
                 </button>
                 <button
                   onClick={() => handleStyleSelect('professional')}
-                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100"
+                  className="w-full text-left px-3 py-2 text-sm hover:bg-accent"
                 >
                   💼 전문적으로
                 </button>
                 <button
                   onClick={() => handleStyleSelect('seo')}
-                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 last:rounded-b-lg"
+                  className="w-full text-left px-3 py-2 text-sm hover:bg-accent last:rounded-b-md"
                 >
                   🔍 SEO 최적화
                 </button>
@@ -345,12 +345,12 @@ export default function ChatInterface({ editorRef }: ChatInterfaceProps) {
             onKeyDown={handleKeyDown}
             placeholder="커스텀 요청을 입력하세요..."
             disabled={isProcessing}
-            className="flex-1 p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+            className="flex-1 p-2 border border-input bg-background rounded-md focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
           />
           <button
             onClick={handleSendMessage}
             disabled={isProcessing || !inputMessage.trim()}
-            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-medium"
           >
             {isProcessing ? (
               <Loader2 className="w-4 h-4 animate-spin" />

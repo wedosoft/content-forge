@@ -63,10 +63,23 @@ export default function BlockNoteEditorWithAI({ onContentChange, editorRef }: Bl
     ]
   });
 
-  // 에디터 참조 설정
+  // 에디터 참조 설정 - BlockNote 에디터 메서드 노출
   useEffect(() => {
     if (editorRef) {
-      editorRef.current = editor;
+      editorRef.current = {
+        get document() {
+          return editor.document;
+        },
+        blocksToHTMLLossy: (blocks: any) => {
+          return editor.blocksToHTMLLossy(blocks);
+        },
+        tryParseHTMLToBlocks: (html: string) => {
+          return editor.tryParseHTMLToBlocks(html);
+        },
+        replaceBlocks: (currentBlocks: any[], newBlocks: any[]) => {
+          editor.replaceBlocks(currentBlocks, newBlocks);
+        }
+      };
     }
   }, [editor, editorRef]);
 

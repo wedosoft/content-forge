@@ -2,7 +2,6 @@
 
 import { useRef, useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
-import Image from 'next/image';
 import ChatInterface from '../components/ChatInterface';
 import { supabaseBlog, BlogCategory } from '../lib/supabase';
 import { Loader2, Send, Search, Edit2, Trash2 } from 'lucide-react';
@@ -167,25 +166,13 @@ export default function Home() {
       setPostTitle(data.post.title);
       setSelectedCategory(data.post.category_id);
 
-      // 에디터가 마운트될 때까지 대기 후 HTML을 에디터에 로드
-      setTimeout(() => {
-        if (editorRef.current && data.post.content_html) {
-          console.log('Loading content to editor:', data.post.content_html.substring(0, 100));
-          try {
-            const blocks = editorRef.current.tryParseHTMLToBlocks(data.post.content_html);
-            console.log('Parsed blocks:', blocks);
-            editorRef.current.replaceBlocks(editorRef.current.document, blocks);
-            console.log('Content loaded successfully');
-          } catch (err) {
-            console.error('Error loading content to editor:', err);
-          }
-        } else {
-          console.error('Editor ref not available or no content:', {
-            hasRef: !!editorRef.current,
-            hasContent: !!data.post.content_html
-          });
-        }
-      }, 100);
+      // HTML을 에디터에 로드 (tryParseHTMLToBlocks 사용)
+      if (editorRef.current && data.post.content_html) {
+        const blocks = editorRef.current.tryParseHTMLToBlocks(data.post.content_html);
+        editorRef.current.replaceBlocks(editorRef.current.document, blocks);
+      }
+
+      // 관리 탭에서 에디터가 표시되도록 상태 유지
     } catch (error) {
       console.error('Edit post error:', error);
       alert('포스트를 불러올 수 없습니다.');
@@ -290,46 +277,28 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <main className="h-screen flex flex-col">
       {/* 헤더 */}
-      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container max-w-7xl flex h-16 items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Image
-              src="/logo-light.webp"
-              alt="WeDoSoft"
-              width={140}
-              height={40}
-              className="h-8 md:h-10 w-auto dark:hidden"
-              priority
-            />
-            <Image
-              src="/logo-dark.webp"
-              alt="WeDoSoft"
-              width={140}
-              height={40}
-              className="h-8 md:h-10 w-auto hidden dark:block"
-              priority
-            />
-            <div className="h-6 w-px bg-border" />
-            <h1 className="text-base md:text-lg font-medium">
-              AI 리라이터
-            </h1>
-          </div>
+      <header className="bg-white border-b p-4">
+        <div className="max-w-7xl mx-auto">
+          <h1 className="text-2xl font-bold text-gray-800">
+            BlockNote AI 리라이터
+          </h1>
+          <p className="text-gray-600 mt-1">
+            에디터에서 텍스트를 작성하고 AI와 채팅하여 리라이팅하세요
+          </p>
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col h-[calc(100vh-4rem)]">
-
       {/* 탭 네비게이션 */}
-      <div className="border-b bg-background">
-        <div className="container max-w-7xl flex gap-4">
+      <div className="bg-white border-b">
+        <div className="max-w-7xl mx-auto flex gap-4 px-6">
           <button
             onClick={() => setActiveTab('create')}
             className={`px-4 py-3 font-medium border-b-2 transition-colors ${
               activeTab === 'create'
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-600 hover:text-gray-800'
             }`}
           >
             새 포스팅
@@ -341,8 +310,8 @@ export default function Home() {
             }}
             className={`px-4 py-3 font-medium border-b-2 transition-colors ${
               activeTab === 'manage'
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-600 hover:text-gray-800'
             }`}
           >
             포스팅 관리
@@ -354,30 +323,30 @@ export default function Home() {
       {activeTab === 'create' && (
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* 블로그 포스팅 컨트롤 */}
-          <div className="border-b bg-background py-3">
-            <div className="container max-w-7xl flex gap-4 items-center">
-              <div className="flex items-center gap-2 flex-1">
-                <label className="text-sm font-medium text-foreground whitespace-nowrap">
-                  제목
+          <div className="bg-white border-b px-6 py-3">
+            <div className="max-w-7xl mx-auto flex gap-3 items-end">
+              <div className="flex-1">
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  포스트 제목
                 </label>
                 <input
                   type="text"
                   value={postTitle}
                   onChange={(e) => setPostTitle(e.target.value)}
-                  placeholder="블로그 포스트 제목"
-                  className="flex-1 px-3 py-2 border border-input bg-background rounded-md focus:outline-none focus:ring-2 focus:ring-ring text-sm"
+                  placeholder="블로그 포스트 제목을 입력하세요"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                 />
               </div>
-              <div className="flex items-center gap-2">
-                <label className="text-sm font-medium text-foreground whitespace-nowrap">
+              <div className="w-48">
+                <label className="block text-xs font-medium text-gray-700 mb-1">
                   카테고리
                 </label>
                 <select
                   value={selectedCategory}
                   onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="w-40 px-3 py-2 border border-input bg-background rounded-md focus:outline-none focus:ring-2 focus:ring-ring text-sm"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                 >
-                  <option value="">선택</option>
+                  <option value="">카테고리 선택</option>
                   {categories.map((cat) => (
                     <option key={cat.id} value={String(cat.id)}>
                       {cat.name_ko}
@@ -388,7 +357,7 @@ export default function Home() {
               <button
                 onClick={handlePublishToBlog}
                 disabled={isPublishing}
-                className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm whitespace-nowrap font-medium"
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm whitespace-nowrap"
               >
                 {isPublishing ? (
                   <>
@@ -398,7 +367,7 @@ export default function Home() {
                 ) : (
                   <>
                     <Send className="w-4 h-4" />
-                    발행
+                    블로그 발행
                   </>
                 )}
               </button>
@@ -406,19 +375,18 @@ export default function Home() {
           </div>
 
           {/* 메인 컨텐츠 */}
-          <div className="flex-1 flex overflow-hidden bg-muted/30">
-            <div className="container max-w-7xl w-full flex py-4 gap-4">
+          <div className="flex-1 flex overflow-hidden">
+            <div className="max-w-7xl mx-auto w-full flex">
               {/* 채팅 영역 (왼쪽) */}
               <div className="w-80 flex-shrink-0">
                 <ChatInterface editorRef={editorRef} />
               </div>
 
               {/* 에디터 영역 (오른쪽) */}
-              <div className="flex-1 overflow-auto">
-                <div className="h-full">
-                  <div className="bg-card rounded-lg shadow-sm border h-full p-4">
-                    <BlockNoteEditorWithAI editorRef={editorRef} />
-                  </div>
+              <div className="flex-1 p-6 overflow-auto">
+                <div className="max-w-4xl mx-auto h-full">
+                <div className="bg-white rounded-lg shadow-sm border h-full p-4">
+                  <BlockNoteEditorWithAI editorRef={editorRef} />
                 </div>
               </div>
             </div>
@@ -431,30 +399,30 @@ export default function Home() {
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* 포스트 수정 컨트롤 (편집 중일 때만 표시) */}
           {editingPostId && (
-            <div className="border-b bg-background py-3">
-              <div className="container max-w-7xl flex gap-4 items-center">
-                <div className="flex items-center gap-2 flex-1">
-                  <label className="text-sm font-medium text-foreground whitespace-nowrap">
-                    제목
+            <div className="bg-white border-b px-6 py-3">
+              <div className="max-w-7xl mx-auto flex gap-3 items-end">
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    포스트 제목
                   </label>
                   <input
                     type="text"
                     value={postTitle}
                     onChange={(e) => setPostTitle(e.target.value)}
-                    placeholder="블로그 포스트 제목"
-                    className="flex-1 px-3 py-2 border border-input bg-background rounded-md focus:outline-none focus:ring-2 focus:ring-ring text-sm"
+                    placeholder="블로그 포스트 제목을 입력하세요"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                   />
                 </div>
-                <div className="flex items-center gap-2">
-                  <label className="text-sm font-medium text-foreground whitespace-nowrap">
+                <div className="w-48">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
                     카테고리
                   </label>
                   <select
                     value={selectedCategory}
                     onChange={(e) => setSelectedCategory(e.target.value)}
-                    className="w-40 px-3 py-2 border border-input bg-background rounded-md focus:outline-none focus:ring-2 focus:ring-ring text-sm"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                   >
-                    <option value="">선택</option>
+                    <option value="">카테고리 선택</option>
                     {categories.map((cat) => (
                       <option key={cat.id} value={String(cat.id)}>
                         {cat.name_ko}
@@ -465,23 +433,23 @@ export default function Home() {
                 <button
                   onClick={handleUpdatePost}
                   disabled={isUpdating}
-                  className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm whitespace-nowrap font-medium"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm whitespace-nowrap"
                 >
                   {isUpdating ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      저장 중
+                      업데이트 중
                     </>
                   ) : (
                     <>
                       <Send className="w-4 h-4" />
-                      저장
+                      업데이트
                     </>
                   )}
                 </button>
                 <button
                   onClick={handleCancelEdit}
-                  className="px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 text-sm whitespace-nowrap font-medium"
+                  className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 text-sm whitespace-nowrap"
                 >
                   취소
                 </button>
@@ -489,20 +457,20 @@ export default function Home() {
             </div>
           )}
 
-          <div className="flex-1 flex overflow-hidden bg-muted/30">
-            <div className="container max-w-7xl w-full flex py-4 gap-4">
+          <div className="flex-1 flex overflow-hidden">
+            <div className="max-w-7xl mx-auto w-full flex">
               {/* 포스트 목록 */}
-              <div className="w-80 border rounded-lg bg-card flex flex-col shadow-sm">
+              <div className="w-80 border-r bg-gray-50 flex flex-col">
               {/* 검색 */}
-              <div className="p-4 border-b">
+              <div className="p-4 border-b bg-white">
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                   <input
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="포스트 검색..."
-                    className="w-full pl-10 pr-4 py-2 border border-input bg-background rounded-md focus:outline-none focus:ring-2 focus:ring-ring text-sm"
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
               </div>
@@ -576,7 +544,6 @@ export default function Home() {
           </div>
         </div>
       )}
-      </main>
-    </div>
+    </main>
   );
 }
