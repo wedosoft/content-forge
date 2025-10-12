@@ -364,3 +364,4 @@ console.log(`[${action}] Extracted text blocks:`,
 - **BlockNote v0.41.1** 에디터
 - **OpenAI GPT-3.5-turbo** AI 모델
 - **Supabase** 외부 블로그 데이터베이스
+
