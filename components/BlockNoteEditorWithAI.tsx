@@ -11,9 +11,16 @@ import {
   getFormattingToolbarItems,
 } from "@blocknote/react";
 
+export interface BlockNoteEditorRef {
+  document: any;
+  blocksToHTMLLossy: (blocks: any) => string;
+  tryParseHTMLToBlocks: (html: string) => any[];
+  replaceBlocks: (currentBlocks: any[], newBlocks: any[]) => void;
+}
+
 interface BlockNoteEditorWithAIProps {
   onContentChange?: (content: any) => void;
-  editorRef?: React.MutableRefObject<any>;
+  editorRef?: React.MutableRefObject<BlockNoteEditorRef | null>;
 }
 
 export default function BlockNoteEditorWithAI({ onContentChange, editorRef }: BlockNoteEditorWithAIProps) {
@@ -46,25 +53,12 @@ export default function BlockNoteEditorWithAI({ onContentChange, editorRef }: Bl
     }
   };
 
-  // BlockNote 에디터 생성
+  // BlockNote 에디터 생성 (빈 에디터로 시작)
   const editor = useCreateBlockNote({
     initialContent: [
       {
-        type: "heading",
-        props: { level: 1 },
-        content: "AI 협업 에디터"
-      },
-      {
         type: "paragraph",
-        content: "텍스트를 선택하고 툴바의 AI 버튼을 눌러보세요. 또는 / 를 입력해서 AI 명령을 사용할 수 있습니다."
-      },
-      {
-        type: "paragraph",
-        content: "인공지능(AI) 기술은 최근 몇 년 동안 놀라운 발전을 이루어왔습니다. 특히 자연어 처리와 기계학습 분야에서의 혁신은 우리의 일상생활과 업무 방식을 크게 변화시키고 있습니다."
-      },
-      {
-        type: "paragraph",
-        content: "This technology will continue to evolve and transform how we work, learn, and communicate in the digital age."
+        content: ""
       }
     ]
   });

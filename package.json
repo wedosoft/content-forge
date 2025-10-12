@@ -14,6 +14,7 @@
     "@blocknote/mantine": "^0.41.1",
     "@blocknote/react": "^0.41.1",
     "@blocknote/xl-ai": "^0.41.1",
+    "@supabase/supabase-js": "^2.75.0",
     "ai": "^5.0.68",
     "clsx": "^2.0.0",
     "lucide-react": "^0.294.0",

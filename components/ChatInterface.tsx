@@ -1,12 +1,10 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { 
-  Send, 
-  Globe, 
-  Sparkles, 
-  FileText, 
-  CheckCircle,
+import {
+  Send,
+  Globe,
+  ChevronDown,
   Loader2,
   MessageCircle
 } from 'lucide-react';
@@ -26,7 +24,9 @@ export default function ChatInterface({ editorRef }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   // 초기 환영 메시지 추가 (클라이언트 사이드에서만)
   useEffect(() => {
@@ -36,6 +36,19 @@ export default function ChatInterface({ editorRef }: ChatInterfaceProps) {
       content: '안녕하세요! 에디터의 텍스트를 AI가 리라이팅해드립니다. 아래 버튼을 사용하거나 직접 요청해보세요.',
       timestamp: new Date()
     }]);
+  }, []);
+
+  // 드롭다운 외부 클릭 감지
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
   }, []);
 
   // 메시지 스크롤
@@ -69,11 +82,12 @@ export default function ChatInterface({ editorRef }: ChatInterfaceProps) {
     const preservedElements: any[] = [];
 
     blocks.forEach((block: any, index: number) => {
-      if (block.type === 'paragraph' || block.type === 'heading') {
+      if (block.type === 'paragraph' || block.type === 'heading' ||
+          block.type === 'bulletListItem' || block.type === 'numberedListItem') {
         const textContent = block.content
           ?.map((item: any) => item.text || '')
           .join('') || '';
-        
+
         if (textContent.trim()) {
           textBlocks.push({
             id: `block_${index}`,
@@ -107,12 +121,13 @@ export default function ChatInterface({ editorRef }: ChatInterfaceProps) {
     
     originalBlocks.forEach((originalBlock: any, index: number) => {
       const preserved = preservedElements.find(el => el.position === index);
-      
+
       if (preserved) {
         // 보존된 요소 (이미지, 테이블 등)
         newBlocks.push(preserved.block);
-      } else if (originalBlock.type === 'paragraph' || originalBlock.type === 'heading') {
-        // 텍스트 블록
+      } else if (originalBlock.type === 'paragraph' || originalBlock.type === 'heading' ||
+                 originalBlock.type === 'bulletListItem' || originalBlock.type === 'numberedListItem') {
+        // 텍스트 블록 (리스트 포함)
         const processedBlock = processedBlocks[processedIndex];
         if (processedBlock) {
           newBlocks.push({
@@ -193,11 +208,19 @@ export default function ChatInterface({ editorRef }: ChatInterfaceProps) {
   const getActionDescription = (action: string) => {
     const descriptions: { [key: string]: string } = {
       'translate': '한국어로 번역',
-      'improve-tone': '어조 개선',
-      'summarize': '요약',
-      'grammar': '맞춤법 교정'
+      'grammar': '맞춤법 교정',
+      'expand': '내용 확장',
+      'simplify': '쉽게 풀어쓰기',
+      'professional': '전문적으로 변환',
+      'seo': 'SEO 최적화'
     };
     return descriptions[action] || action;
+  };
+
+  // 드롭다운 옵션 선택 핸들러
+  const handleStyleSelect = async (action: string) => {
+    setIsDropdownOpen(false);
+    await handleRewriteRequest(action);
   };
 
   // 사용자 메시지 처리
@@ -264,30 +287,53 @@ export default function ChatInterface({ editorRef }: ChatInterfaceProps) {
             <Globe className="w-4 h-4" />
             번역
           </button>
-          <button
-            onClick={() => handleRewriteRequest('improve-tone')}
-            disabled={isProcessing}
-            className="flex items-center gap-2 p-2 text-sm bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Sparkles className="w-4 h-4" />
-            어조 개선
-          </button>
-          <button
-            onClick={() => handleRewriteRequest('summarize')}
-            disabled={isProcessing}
-            className="flex items-center gap-2 p-2 text-sm bg-green-50 hover:bg-green-100 text-green-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <FileText className="w-4 h-4" />
-            요약
-          </button>
-          <button
-            onClick={() => handleRewriteRequest('grammar')}
-            disabled={isProcessing}
-            className="flex items-center gap-2 p-2 text-sm bg-orange-50 hover:bg-orange-100 text-orange-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <CheckCircle className="w-4 h-4" />
-            교정
-          </button>
+
+          {/* 스타일 변경 드롭다운 */}
+          <div className="relative" ref={dropdownRef}>
+            <button
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              disabled={isProcessing}
+              className="w-full flex items-center justify-between gap-2 p-2 text-sm bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <span>✨ 스타일 변경</span>
+              <ChevronDown className="w-4 h-4" />
+            </button>
+
+            {isDropdownOpen && (
+              <div className="absolute bottom-full left-0 right-0 mb-1 bg-white border rounded-lg shadow-lg z-10">
+                <button
+                  onClick={() => handleStyleSelect('grammar')}
+                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 first:rounded-t-lg"
+                >
+                  ✓ 맞춤법 교정
+                </button>
+                <button
+                  onClick={() => handleStyleSelect('expand')}
+                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100"
+                >
+                  📝 내용 확장
+                </button>
+                <button
+                  onClick={() => handleStyleSelect('simplify')}
+                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100"
+                >
+                  💡 쉽게 풀어쓰기
+                </button>
+                <button
+                  onClick={() => handleStyleSelect('professional')}
+                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100"
+                >
+                  💼 전문적으로
+                </button>
+                <button
+                  onClick={() => handleStyleSelect('seo')}
+                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 last:rounded-b-lg"
+                >
+                  🔍 SEO 최적화
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* 메시지 입력 */}

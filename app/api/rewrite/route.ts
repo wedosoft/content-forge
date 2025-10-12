@@ -14,20 +14,28 @@ export async function POST(request: NextRequest) {
 
     switch (action) {
       case 'translate':
-        systemPrompt = `당신은 전문 번역가입니다. 주어진 텍스트 블록들을 자연스러운 한국어로 번역해주세요. 
+        systemPrompt = `당신은 전문 번역가입니다. 주어진 텍스트 블록들을 자연스러운 한국어로 번역해주세요.
         각 블록의 ID와 구조를 유지하면서 텍스트만 번역하세요.`;
         break;
-      case 'improve-tone':
-        systemPrompt = `당신은 글쓰기 전문가입니다. 주어진 텍스트를 더 정중하고 전문적인 어조로 개선해주세요. 
-        의미는 그대로 유지하면서 어조만 개선하세요.`;
-        break;
-      case 'summarize':
-        systemPrompt = `당신은 요약 전문가입니다. 주어진 텍스트의 핵심 내용을 간결하게 요약해주세요. 
-        중요한 정보는 누락하지 말고 불필요한 부분은 제거하세요.`;
-        break;
       case 'grammar':
-        systemPrompt = `당신는 교정 전문가입니다. 주어진 텍스트의 맞춤법, 문법, 띄어쓰기를 교정해주세요. 
+        systemPrompt = `당신는 교정 전문가입니다. 주어진 텍스트의 맞춤법, 문법, 띄어쓰기를 교정해주세요.
         내용은 변경하지 말고 오류만 수정하세요.`;
+        break;
+      case 'expand':
+        systemPrompt = `당신은 콘텐츠 작성 전문가입니다. 주어진 텍스트를 더 상세하고 풍부하게 확장해주세요.
+        핵심 내용은 유지하면서 예시, 설명, 세부사항을 추가하여 블로그 포스팅에 적합하게 만드세요.`;
+        break;
+      case 'simplify':
+        systemPrompt = `당신은 쉬운 글쓰기 전문가입니다. 주어진 텍스트를 누구나 이해하기 쉽게 단순화해주세요.
+        어려운 용어는 쉬운 말로 바꾸고, 복잡한 문장은 간단하게 풀어서 작성하세요.`;
+        break;
+      case 'professional':
+        systemPrompt = `당신은 비즈니스 글쓰기 전문가입니다. 주어진 텍스트를 전문적이고 비즈니스에 적합한 어조로 변환해주세요.
+        격식있고 신뢰감 있는 표현을 사용하되 과도하게 딱딱하지 않게 작성하세요.`;
+        break;
+      case 'seo':
+        systemPrompt = `당신은 SEO 전문가입니다. 주어진 텍스트를 검색엔진 최적화에 적합하게 개선해주세요.
+        자연스러운 키워드 배치, 명확한 문장 구조, 정보성 있는 표현을 사용하여 검색 노출에 유리하게 작성하세요.`;
         break;
       case 'custom':
         systemPrompt = `당신은 텍스트 편집 전문가입니다. 사용자의 요청에 따라 텍스트를 수정해주세요: ${customInstruction}`;
