@@ -71,104 +71,84 @@ export default function ChatInterface({ editorRef }: ChatInterfaceProps) {
     setMessages(prev => [...prev, newMessage]);
   };
 
-  // 에디터에서 텍스트 블록 추출
-  const extractTextBlocks = () => {
-    if (!editorRef.current) {
-      throw new Error('에디터를 찾을 수 없습니다.');
-    }
+  // 텍스트만 추출 (재귀)
+  const extractTextBlocks = (doc: any[]) => {
+    const textBlocks: { id: string; text: string }[] = [];
 
-    const blocks = editorRef.current.document;
-    const textBlocks: any[] = [];
-    const preservedElements: any[] = [];
+    const extract = (block: any) => {
+      if (block.content && Array.isArray(block.content)) {
+        const text = block.content
+          .filter((item: any) => item.type === 'text')
+          .map((item: any) => item.text || '')
+          .join('');
 
-    blocks.forEach((block: any, index: number) => {
-      if (block.type === 'paragraph' || block.type === 'heading' ||
-          block.type === 'bulletListItem' || block.type === 'numberedListItem') {
-        const textContent = block.content
-          ?.map((item: any) => item.text || '')
-          .join('') || '';
-
-        if (textContent.trim()) {
-          textBlocks.push({
-            id: `block_${index}`,
-            text: textContent,
-            type: block.type,
-            props: block.props || {},
-            content: block.content || [] // 원본 content 보존 (스타일 포함)
-          });
+        if (text.trim()) {
+          textBlocks.push({ id: block.id, text });
         }
-      } else {
-        // 이미지, 테이블 등 다른 요소들은 보존
-        preservedElements.push({
-          id: `preserved_${index}`,
-          block: block,
-          position: index
-        });
       }
-    });
 
-    return { textBlocks, preservedElements };
+      if (block.children && Array.isArray(block.children)) {
+        block.children.forEach((child: any) => extract(child));
+      }
+    };
+
+    doc.forEach((block: any) => extract(block));
+    return textBlocks;
   };
 
-  // 처리된 블록을 에디터에 반영
-  const updateEditorContent = async (processedBlocks: any[], preservedElements: any[]) => {
+  // 원본 document에서 텍스트만 교체 (재귀)
+  const updateEditorContent = async (originalDoc: any[], translatedTexts: Map<string, string>) => {
     if (!editorRef.current) return;
 
-    const newBlocks: any[] = [];
-    let processedIndex = 0;
+    console.log(`🔧 Updating ${translatedTexts.size} text blocks`);
 
-    // 원본 블록 순서대로 재구성
-    const originalBlocks = editorRef.current.document;
-    
-    originalBlocks.forEach((originalBlock: any, index: number) => {
-      const preserved = preservedElements.find(el => el.position === index);
+    // 원본 document deep copy
+    const newDocument = JSON.parse(JSON.stringify(originalDoc));
 
-      if (preserved) {
-        // 보존된 요소 (이미지, 테이블 등)
-        newBlocks.push(preserved.block);
-      } else if (originalBlock.type === 'paragraph' || originalBlock.type === 'heading' ||
-                 originalBlock.type === 'bulletListItem' || originalBlock.type === 'numberedListItem') {
-        // 텍스트 블록 (리스트 포함)
-        const processedBlock = processedBlocks[processedIndex];
-        if (processedBlock) {
-          // 원본 content가 있으면 스타일을 보존하면서 텍스트만 교체
-          let newContent;
-          if (processedBlock.content && processedBlock.content.length > 0) {
-            // 원본 스타일 보존: 첫 번째 content 아이템의 스타일을 사용
-            const originalStyles = processedBlock.content[0]?.styles || {};
-            newContent = [
-              {
-                type: 'text',
-                text: processedBlock.text,
-                styles: originalStyles
+    // 재귀적으로 텍스트만 교체
+    const replaceText = (block: any) => {
+      if (block.content && Array.isArray(block.content)) {
+        const translatedText = translatedTexts.get(block.id);
+
+        if (translatedText !== undefined) {
+          // ⭐ 모든 text 항목을 찾아서 하나로 합친 후, 첫 번째만 유지
+          let firstTextItemFound = false;
+
+          block.content = block.content.filter((item: any) => {
+            if (item.type === 'text') {
+              if (!firstTextItemFound) {
+                firstTextItemFound = true;
+                return true; // 첫 번째 text 항목만 유지
               }
-            ];
-          } else {
-            // 원본 content가 없으면 기본 스타일
-            newContent = [
-              {
+              return false; // 나머지 text 항목은 제거
+            }
+            return true; // text가 아닌 항목은 유지 (link 등)
+          }).map((item: any) => {
+            if (item.type === 'text') {
+              return {
                 type: 'text',
-                text: processedBlock.text,
-                styles: {}
-              }
-            ];
-          }
-
-          newBlocks.push({
-            type: processedBlock.type,
-            props: originalBlock.props || {},
-            content: newContent
+                text: translatedText,
+                styles: {}  // ⭐ 서식 초기화 (여러 서식이 섞여있었으므로)
+              };
+            }
+            return item;
           });
-          processedIndex++;
+
+          console.log(`✅ Replaced text for block ${block.id}`);
         }
       }
-    });
 
-    // 에디터 내용 업데이트
-    editorRef.current.replaceBlocks(editorRef.current.document, newBlocks);
+      if (block.children && Array.isArray(block.children)) {
+        block.children.forEach((child: any) => replaceText(child));
+      }
+    };
 
-    // 에디터 업데이트가 완전히 반영될 때까지 대기
-    await new Promise(resolve => setTimeout(resolve, 100));
+    newDocument.forEach((block: any) => replaceText(block));
+
+    // 에디터 업데이트
+    editorRef.current.replaceBlocks(originalDoc, newDocument);
+
+    console.log('✅ Editor updated successfully');
   };
 
   // 리라이팅 처리
@@ -176,17 +156,24 @@ export default function ChatInterface({ editorRef }: ChatInterfaceProps) {
     if (isProcessing) return;
 
     setIsProcessing(true);
-    
-    try {
-      // 에디터에서 콘텐츠 추출
-      const { textBlocks, preservedElements } = extractTextBlocks();
 
-      console.log(`[${action}] Extracted text blocks:`, textBlocks.map(b => ({ id: b.id, text: b.text.substring(0, 50) })));
+    try {
+      if (!editorRef.current) {
+        throw new Error('에디터를 찾을 수 없습니다.');
+      }
+
+      // 원본 document 저장
+      const originalDocument = JSON.parse(JSON.stringify(editorRef.current.document));
+
+      // 텍스트만 추출
+      const textBlocks = extractTextBlocks(originalDocument);
 
       if (textBlocks.length === 0) {
         addMessage('error', '처리할 텍스트가 없습니다. 에디터에 텍스트를 입력해주세요.');
         return;
       }
+
+      console.log(`[${action}] 🔍 Extracted ${textBlocks.length} text blocks`);
 
       addMessage('user', customInstruction || getActionDescription(action));
       addMessage('system', '텍스트를 처리 중입니다...');
@@ -209,16 +196,23 @@ export default function ChatInterface({ editorRef }: ChatInterfaceProps) {
       }
 
       const data = await response.json();
-      
+
       if (data.error) {
         throw new Error(data.error);
       }
 
-      // 결과를 에디터에 반영
-      await updateEditorContent(data.processedBlocks, preservedElements);
-      
+      console.log(`[${action}] 📦 Received ${data.processedBlocks.length} processed blocks`);
+
+      // 번역된 텍스트를 Map으로 변환
+      const translatedTexts = new Map<string, string>(
+        data.processedBlocks.map((block: any) => [block.id, block.text])
+      );
+
+      // 원본 document에서 텍스트만 교체
+      await updateEditorContent(originalDocument, translatedTexts);
+
       addMessage('success', `✅ ${getActionDescription(action)} 완료!`);
-      
+
     } catch (error) {
       console.error('리라이팅 오류:', error);
       addMessage('error', `❌ 오류: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
