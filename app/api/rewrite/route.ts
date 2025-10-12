@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
         systemPrompt = '주어진 텍스트를 개선해주세요.';
     }
 
-    userPrompt = `다음 텍스트 블록들을 처리해주세요:
+    userPrompt = `다음 텍스트 블록의 각 segment를 요청에 맞게 처리해주세요. segment 순서와 개수를 유지하고 text만 변경하세요:
 
 ${JSON.stringify(textBlocks, null, 2)}
 
@@ -47,14 +47,20 @@ ${JSON.stringify(textBlocks, null, 2)}
   "processedBlocks": [
     {
       "id": "원본_블록_ID",
-      "text": "처리된_텍스트"
+      "segments": [
+        {
+          "index": 0,
+          "text": "처리된_텍스트"
+        }
+      ]
     }
   ]
 }
 
 중요한 규칙:
 - id는 원본과 정확히 동일하게 유지하세요
-- text 내용만 요청에 따라 처리하세요
+- segment 배열의 길이와 각 segment.index는 원본과 동일해야 합니다
+- 각 segment.text만 요청에 따라 처리하세요
 - JSON 형식 외의 다른 설명은 포함하지 마세요`;
 
     const completion = await openai.chat.completions.create({

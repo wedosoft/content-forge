@@ -73,17 +73,20 @@ export default function ChatInterface({ editorRef }: ChatInterfaceProps) {
 
   // 텍스트만 추출 (재귀)
   const extractTextBlocks = (doc: any[]) => {
-    const textBlocks: { id: string; text: string }[] = [];
+    const textBlocks: { id: string; segments: { index: number; text: string }[] }[] = [];
 
     const extract = (block: any) => {
       if (block.content && Array.isArray(block.content)) {
-        const text = block.content
+        const textSegments = block.content
           .filter((item: any) => item.type === 'text')
-          .map((item: any) => item.text || '')
-          .join('');
+          .map((item: any, index: number) => ({
+            index,
+            text: item.text || ''
+          }))
+          .filter((segment: { index: number; text: string }) => segment.text.trim().length > 0);
 
-        if (text.trim()) {
-          textBlocks.push({ id: block.id, text });
+        if (textSegments.length > 0) {
+          textBlocks.push({ id: block.id, segments: textSegments });
         }
       }
 
@@ -97,7 +100,10 @@ export default function ChatInterface({ editorRef }: ChatInterfaceProps) {
   };
 
   // 원본 document에서 텍스트만 교체 (재귀)
-  const updateEditorContent = async (originalDoc: any[], translatedTexts: Map<string, string>) => {
+  const updateEditorContent = async (
+    originalDoc: any[],
+    translatedTexts: Map<string, { index: number; text: string }[]>
+  ) => {
     if (!editorRef.current) return;
 
     console.log(`🔧 Updating ${translatedTexts.size} text blocks`);
@@ -108,33 +114,27 @@ export default function ChatInterface({ editorRef }: ChatInterfaceProps) {
     // 재귀적으로 텍스트만 교체
     const replaceText = (block: any) => {
       if (block.content && Array.isArray(block.content)) {
-        const translatedText = translatedTexts.get(block.id);
+        const translatedSegments = translatedTexts.get(block.id);
 
-        if (translatedText !== undefined) {
-          // ⭐ 모든 text 항목을 찾아서 하나로 합친 후, 첫 번째만 유지
-          let firstTextItemFound = false;
+        if (translatedSegments && translatedSegments.length > 0) {
+          let segmentCursor = 0;
 
-          block.content = block.content.filter((item: any) => {
+          block.content = block.content.map((item: any) => {
             if (item.type === 'text') {
-              if (!firstTextItemFound) {
-                firstTextItemFound = true;
-                return true; // 첫 번째 text 항목만 유지
+              const segment = translatedSegments[segmentCursor];
+              segmentCursor += 1;
+
+              if (segment) {
+                return {
+                  ...item,
+                  text: segment.text
+                };
               }
-              return false; // 나머지 text 항목은 제거
-            }
-            return true; // text가 아닌 항목은 유지 (link 등)
-          }).map((item: any) => {
-            if (item.type === 'text') {
-              return {
-                type: 'text',
-                text: translatedText,
-                styles: {}  // ⭐ 서식 초기화 (여러 서식이 섞여있었으므로)
-              };
             }
             return item;
           });
 
-          console.log(`✅ Replaced text for block ${block.id}`);
+          console.log(`✅ Replaced ${translatedSegments.length} segments for block ${block.id}`);
         }
       }
 
@@ -146,7 +146,7 @@ export default function ChatInterface({ editorRef }: ChatInterfaceProps) {
     newDocument.forEach((block: any) => replaceText(block));
 
     // 에디터 업데이트
-    editorRef.current.replaceBlocks(originalDoc, newDocument);
+    editorRef.current.replaceBlocks(editorRef.current.document, newDocument);
 
     console.log('✅ Editor updated successfully');
   };
@@ -204,8 +204,18 @@ export default function ChatInterface({ editorRef }: ChatInterfaceProps) {
       console.log(`[${action}] 📦 Received ${data.processedBlocks.length} processed blocks`);
 
       // 번역된 텍스트를 Map으로 변환
-      const translatedTexts = new Map<string, string>(
-        data.processedBlocks.map((block: any) => [block.id, block.text])
+      const translatedTexts = new Map<string, { index: number; text: string }[]>(
+        data.processedBlocks.map((block: any) => {
+          if (Array.isArray(block.segments)) {
+            return [block.id, block.segments];
+          }
+
+          if (typeof block.text === 'string') {
+            return [block.id, [{ index: 0, text: block.text }]];
+          }
+
+          return [block.id, []];
+        })
       );
 
       // 원본 document에서 텍스트만 교체
