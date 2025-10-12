@@ -1,15 +1,39 @@
 'use client';
 
-import { useCreateBlockNote } from "@blocknote/react";
-import { BlockNoteView } from "@blocknote/mantine";
+import { useEffect, useMemo } from "react";
+import { createOpenAI } from "@ai-sdk/openai";
+import { BlockNoteEditor, filterSuggestionItems } from "@blocknote/core";
 import "@blocknote/core/fonts/inter.css";
+import { en } from "@blocknote/core/locales";
+import { BlockNoteView } from "@blocknote/mantine";
 import "@blocknote/mantine/style.css";
-import { useEffect } from "react";
 import {
   FormattingToolbar,
   FormattingToolbarController,
+  SuggestionMenuController,
+  getDefaultReactSlashMenuItems,
   getFormattingToolbarItems,
+  useCreateBlockNote,
 } from "@blocknote/react";
+import {
+  AIMenuController,
+  AIToolbarButton,
+  ClientSideTransport,
+  createAIExtension,
+  fetchViaProxy,
+  getAISlashMenuItems,
+} from "@blocknote/xl-ai";
+import { en as aiEn } from "@blocknote/xl-ai/locales";
+
+const getEnv = (key: string) => {
+  if (typeof process !== "undefined" && process.env) {
+    return (
+      process.env[`NEXT_PUBLIC_${key}` as keyof NodeJS.ProcessEnv] ||
+      process.env[key as keyof NodeJS.ProcessEnv]
+    );
+  }
+  return undefined;
+};
 
 export interface BlockNoteEditorRef {
   document: any;
@@ -24,43 +48,48 @@ interface BlockNoteEditorWithAIProps {
 }
 
 export default function BlockNoteEditorWithAI({ onContentChange, editorRef }: BlockNoteEditorWithAIProps) {
-  // AI 처리를 위한 커스텀 함수
-  const handleAIRequest = async (prompt: string, selectedText: string) => {
-    try {
-      const response = await fetch('/api/rewrite', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          textBlocks: [
-            {
-              id: 'selected_block',
-              text: selectedText,
-              type: 'paragraph'
-            }
-          ],
-          action: 'custom',
-          customInstruction: prompt
-        }),
-      });
+  const baseUrl =
+    getEnv("BLOCKNOTE_AI_SERVER_BASE_URL") ||
+    (typeof window !== "undefined" ? `${window.location.origin}/api/ai` : "/api/ai");
 
-      const data = await response.json();
-      return data.processedBlocks?.[0]?.text || '처리 중 오류가 발생했습니다.';
-    } catch (error) {
-      console.error('AI 요청 오류:', error);
-      return '처리 중 오류가 발생했습니다.';
-    }
-  };
+  const model = useMemo(
+    () =>
+      createOpenAI({
+        apiKey: "unused",
+        fetch: fetchViaProxy((url) => `${baseUrl}/proxy?provider=openai&url=${encodeURIComponent(url)}`),
+      })("gpt-4o"),
+    [baseUrl]
+  );
+
+  const aiTransport = useMemo(
+    () =>
+      new ClientSideTransport({
+        model,
+      }),
+    [model]
+  );
+
+  const aiExtension = useMemo(
+    () =>
+      createAIExtension({
+        transport: aiTransport,
+      }),
+    [aiTransport]
+  );
 
   // BlockNote 에디터 생성 (빈 에디터로 시작)
   const editor = useCreateBlockNote({
+    dictionary: {
+      ...en,
+      ai: aiEn,
+    },
+    extensions: [aiExtension],
     initialContent: [
       {
         type: "paragraph",
-        content: ""
-      }
-    ]
+        content: "",
+      },
+    ],
   });
 
   // 에디터 참조 설정 - BlockNote 에디터 메서드 노출
@@ -97,69 +126,43 @@ export default function BlockNoteEditorWithAI({ onContentChange, editorRef }: Bl
         editor={editor}
         onChange={handleChange}
         theme="light"
+        formattingToolbar={false}
+        slashMenu={false}
       >
-        {/* 포맷팅 툴바에 AI 버튼 추가 */}
+        <AIMenuController />
+
         <FormattingToolbarController
           formattingToolbar={() => (
             <FormattingToolbar>
               {...getFormattingToolbarItems()}
-              {/* 커스텀 AI 버튼 */}
-              <CustomAIButton editor={editor} onAIRequest={handleAIRequest} />
+              <AIToolbarButton />
             </FormattingToolbar>
           )}
         />
+
+        <SuggestionMenuWithAI editor={editor} />
       </BlockNoteView>
     </div>
   );
 }
 
-// 커스텀 AI 버튼 컴포넌트
-function CustomAIButton({ editor, onAIRequest }: { editor: any, onAIRequest: (prompt: string, text: string) => Promise<string> }) {
-  const handleAIClick = async () => {
-    const selectedText = editor.getSelectedText();
-    const currentBlock = editor.getTextCursorPosition().block;
-    const textToProcess = selectedText || currentBlock.content?.[0]?.text || '';
-    
-    if (!textToProcess) {
-      alert('처리할 텍스트를 선택하거나 블록에 텍스트를 입력해주세요.');
-      return;
-    }
-
-    // 사용자에게 AI 명령 입력 받기
-    const userPrompt = prompt('AI에게 어떤 작업을 요청하시겠습니까?\n\n예시: "한국어로 번역해줘", "더 정중한 어조로 바꿔줘", "요약해줘"');
-    
-    if (userPrompt) {
-      try {
-        // 로딩 표시
-        const loadingText = '🔄 AI 처리 중...';
-        editor.updateBlock(currentBlock, {
-          content: [{ type: 'text', text: loadingText }]
-        });
-
-        // AI 처리 요청
-        const processedText = await onAIRequest(userPrompt, textToProcess);
-        
-        // 결과 반영
-        editor.updateBlock(currentBlock, {
-          content: [{ type: 'text', text: processedText }]
-        });
-      } catch (error) {
-        console.error('AI 처리 오류:', error);
-        editor.updateBlock(currentBlock, {
-          content: [{ type: 'text', text: textToProcess }] // 원본 복원
-        });
-        alert('AI 처리 중 오류가 발생했습니다.');
-      }
-    }
-  };
-
+function SuggestionMenuWithAI({
+  editor,
+}: {
+  editor: BlockNoteEditor<any, any, any>;
+}) {
   return (
-    <button
-      className="bn-button"
-      onClick={handleAIClick}
-      title="AI로 텍스트 처리"
-    >
-      🤖 AI
-    </button>
+    <SuggestionMenuController
+      triggerCharacter="/"
+      getItems={async (query) =>
+        filterSuggestionItems(
+          [
+            ...getDefaultReactSlashMenuItems(editor),
+            ...getAISlashMenuItems(editor),
+          ],
+          query,
+        )
+      }
+    />
   );
 }
