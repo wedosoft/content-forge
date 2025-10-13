@@ -7,6 +7,8 @@ import {
   validateCredentials,
 } from '@/lib/simple-auth';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   try {
     const { email, password } = await request.json();

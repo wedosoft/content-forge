@@ -52,7 +52,9 @@ export default function Home() {
 
     const checkAuth = async () => {
       try {
-        const response = await fetch('/api/auth/session');
+        const response = await fetch('/api/auth/session', {
+          credentials: 'include',
+        });
 
         if (!response.ok) {
           throw new Error('세션 확인에 실패했습니다.');
@@ -162,7 +164,10 @@ export default function Home() {
   // 로그아웃 핸들러
   const handleLogout = async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include',
+      });
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
