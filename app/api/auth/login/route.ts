@@ -31,13 +31,15 @@ export async function POST(request: NextRequest) {
       user: getAuthenticatedUser(),
     });
 
+    const isHttps = request.nextUrl.protocol === 'https:';
+
     response.cookies.set({
       name: SESSION_COOKIE_NAME,
       value: SESSION_TOKEN,
       maxAge: SESSION_MAX_AGE,
       httpOnly: true,
       sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
+      secure: isHttps,
       path: '/',
     });
 

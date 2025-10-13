@@ -8,13 +8,15 @@ export async function POST(request: NextRequest) {
       message: '로그아웃되었습니다.',
     });
 
+    const isHttps = request.nextUrl.protocol === 'https:';
+
     response.cookies.set({
       name: SESSION_COOKIE_NAME,
       value: '',
       maxAge: 0,
       httpOnly: true,
       sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
+      secure: isHttps,
       path: '/',
     });
 
