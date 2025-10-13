@@ -185,6 +185,61 @@ export default function Home() {
     return null;
   }
 
+  const sanitizeHtmlForDarkMode = (html: string) => {
+    if (typeof window === 'undefined') {
+      return html;
+    }
+
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(`<div>${html}</div>`, 'text/html');
+      const wrapper = doc.body.firstElementChild as HTMLElement | null;
+      const elements = doc.body.querySelectorAll<HTMLElement>('*');
+
+      const stripBackground = (element: HTMLElement) => {
+        if (element.hasAttribute('bgcolor')) {
+          element.removeAttribute('bgcolor');
+        }
+        if (element.hasAttribute('background')) {
+          element.removeAttribute('background');
+        }
+
+        const styleAttr = element.getAttribute('style');
+        if (!styleAttr) {
+          return;
+        }
+
+        const filteredRules = styleAttr
+          .split(';')
+          .map((rule) => rule.trim())
+          .filter(Boolean)
+          .filter((rule) => {
+            const [property] = rule.split(':');
+            if (!property) return false;
+            return !property.trim().toLowerCase().startsWith('background');
+          });
+
+        if (filteredRules.length > 0) {
+          element.setAttribute('style', filteredRules.join('; '));
+        } else {
+          element.removeAttribute('style');
+        }
+      };
+
+      elements.forEach(stripBackground);
+      if (wrapper) {
+        stripBackground(wrapper);
+        return wrapper.innerHTML;
+      }
+
+      stripBackground(doc.body as HTMLElement);
+      return doc.body.innerHTML;
+    } catch (error) {
+      console.error('Failed to sanitize HTML background styles:', error);
+      return html;
+    }
+  };
+
   // 포스트 발행
   const handlePublishToBlog = async () => {
     if (!postTitle.trim()) {
@@ -206,7 +261,8 @@ export default function Home() {
 
     try {
       const blocks = editorRef.current.document;
-      const htmlContent = editorRef.current.blocksToHTMLLossy(blocks);
+      const rawHtml = editorRef.current.blocksToHTMLLossy(blocks);
+      const htmlContent = sanitizeHtmlForDarkMode(rawHtml);
 
       const response = await fetch('/api/publish-blog', {
         method: 'POST',
@@ -261,7 +317,8 @@ export default function Home() {
         if (editorRef.current && data.post.content_html) {
           console.log('Loading content to editor:', data.post.content_html.substring(0, 100));
           try {
-            const blocks = editorRef.current.tryParseHTMLToBlocks(data.post.content_html);
+            const cleanedHtml = sanitizeHtmlForDarkMode(data.post.content_html);
+            const blocks = editorRef.current.tryParseHTMLToBlocks(cleanedHtml);
             console.log('Parsed blocks:', blocks);
             editorRef.current.replaceBlocks(editorRef.current.document, blocks);
             console.log('Content loaded successfully');
@@ -299,7 +356,8 @@ export default function Home() {
 
     try {
       const blocks = editorRef.current.document;
-      const htmlContent = editorRef.current.blocksToHTMLLossy(blocks);
+      const rawHtml = editorRef.current.blocksToHTMLLossy(blocks);
+      const htmlContent = sanitizeHtmlForDarkMode(rawHtml);
 
       const response = await fetch(`/api/posts/${editingPostId}`, {
         method: 'PUT',
