@@ -34,13 +34,6 @@ export async function POST(request: NextRequest) {
     // Service Role Key로 Supabase 클라이언트 생성 (RLS 우회)
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // 슬러그 생성 (title 기반)
-    const slug = title
-      .toLowerCase()
-      .replace(/[^a-z0-9가-힣\s-]/g, '')
-      .replace(/\s+/g, '-')
-      .substring(0, 100);
-
     // 현재 최대 wp_post_id 가져오기
     const { data: maxPost } = await supabase
       .from('blog_posts')
@@ -51,6 +44,9 @@ export async function POST(request: NextRequest) {
 
     // 다음 wp_post_id 생성 (최대값 + 1, 없으면 8211부터 시작)
     const wp_post_id = maxPost?.wp_post_id ? maxPost.wp_post_id + 1 : 8211;
+
+    // 슬러그를 숫자 증가 방식으로 설정
+    const slug = String(wp_post_id);
 
     const postData = {
       title,

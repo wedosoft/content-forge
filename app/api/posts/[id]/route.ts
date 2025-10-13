@@ -57,17 +57,9 @@ export async function PUT(
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // 슬러그 생성
-    const slug = title
-      .toLowerCase()
-      .replace(/[^a-z0-9가-힣\s-]/g, '')
-      .replace(/\s+/g, '-')
-      .substring(0, 100);
-
     const updateData = {
       title,
       content_html: content,
-      slug,
       category_id,
       updated_at: new Date().toISOString(),
     };
