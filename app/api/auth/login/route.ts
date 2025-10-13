@@ -11,6 +11,11 @@ export async function POST(request: NextRequest) {
   try {
     const { email, password } = await request.json();
 
+    console.log('[auth/login] attempt', {
+      email,
+      hasPassword: typeof password === 'string' && password.length > 0,
+    });
+
     if (!email || !password) {
       return NextResponse.json(
         { error: '이메일과 비밀번호를 입력해주세요.' },
@@ -18,7 +23,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!validateCredentials(email, password)) {
+    const credentialsValid = validateCredentials(email, password);
+
+    console.log('[auth/login] credentialsValid', credentialsValid);
+
+    if (!credentialsValid) {
       return NextResponse.json(
         { error: '이메일 또는 비밀번호가 올바르지 않습니다.' },
         { status: 401 }
