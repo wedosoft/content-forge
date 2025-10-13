@@ -27,6 +27,7 @@ export default function ChatInterface({ editorRef }: ChatInterfaceProps) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // 초기 환영 메시지 추가 (클라이언트 사이드에서만)
   useEffect(() => {
@@ -162,6 +163,9 @@ export default function ChatInterface({ editorRef }: ChatInterfaceProps) {
         throw new Error('에디터를 찾을 수 없습니다.');
       }
 
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+
       // 원본 document 저장
       const originalDocument = JSON.parse(JSON.stringify(editorRef.current.document));
 
@@ -184,6 +188,7 @@ export default function ChatInterface({ editorRef }: ChatInterfaceProps) {
         headers: {
           'Content-Type': 'application/json',
         },
+        signal: controller.signal,
         body: JSON.stringify({
           textBlocks,
           action,
@@ -224,9 +229,14 @@ export default function ChatInterface({ editorRef }: ChatInterfaceProps) {
       addMessage('success', `✅ ${getActionDescription(action)} 완료!`);
 
     } catch (error) {
-      console.error('리라이팅 오류:', error);
-      addMessage('error', `❌ 오류: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        addMessage('system', '⏹️ 요청을 취소했습니다.');
+      } else {
+        console.error('리라이팅 오류:', error);
+        addMessage('error', `❌ 오류: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
+      }
     } finally {
+      abortControllerRef.current = null;
       setIsProcessing(false);
     }
   };
@@ -258,6 +268,12 @@ export default function ChatInterface({ editorRef }: ChatInterfaceProps) {
     setInputMessage('');
     
     await handleRewriteRequest('custom', message);
+  };
+
+  const handleCancelRequest = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
   };
 
   // 엔터키 처리
@@ -378,17 +394,25 @@ export default function ChatInterface({ editorRef }: ChatInterfaceProps) {
             disabled={isProcessing}
             className="flex-1 p-2 border border-input bg-background rounded-md focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
           />
-          <button
-            onClick={handleSendMessage}
-            disabled={isProcessing || !inputMessage.trim()}
-            className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-medium"
-          >
-            {isProcessing ? (
+          {isProcessing ? (
+            <button
+              type="button"
+              onClick={handleCancelRequest}
+              className="px-4 py-2 bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90 flex items-center gap-2 text-sm font-medium"
+            >
               <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
+              취소
+            </button>
+          ) : (
+            <button
+              onClick={handleSendMessage}
+              disabled={!inputMessage.trim()}
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-medium"
+            >
               <Send className="w-4 h-4" />
-            )}
-          </button>
+              전송
+            </button>
+          )}
         </div>
       </div>
     </div>

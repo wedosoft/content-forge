@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import ChatInterface from '../components/ChatInterface';
 import { supabaseBlog, BlogCategory } from '../lib/supabase';
-import { Loader2, Send, Search, Edit2, Trash2, LogOut } from 'lucide-react';
+import { Loader2, Send, Search, Edit2, Trash2, LogOut, Link2 } from 'lucide-react';
 
 // BlockNote AI 에디터를 동적으로 로드 (SSR 방지)
 const BlockNoteEditorWithAI = dynamic(
@@ -45,6 +45,9 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState('');
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [importUrl, setImportUrl] = useState('');
+  const [isImporting, setIsImporting] = useState(false);
+  const [importError, setImportError] = useState('');
 
   // 인증 상태 확인
   useEffect(() => {
@@ -190,7 +193,12 @@ export default function Home() {
     return null;
   }
 
-  const sanitizeHtmlForDarkMode = (html: string) => {
+  const sanitizeHtmlForDarkMode = (
+    html: string,
+    options?: {
+      baseUrl?: string;
+    }
+  ) => {
     if (typeof window === 'undefined') {
       return html;
     }
@@ -199,7 +207,56 @@ export default function Home() {
       const parser = new DOMParser();
       const doc = parser.parseFromString(`<div>${html}</div>`, 'text/html');
       const wrapper = doc.body.firstElementChild as HTMLElement | null;
-      const elements = doc.body.querySelectorAll<HTMLElement>('*');
+      const root = (wrapper ?? doc.body) as HTMLElement;
+
+      const allowedIframeHosts = new Set([
+        'www.youtube.com',
+        'youtube.com',
+        'm.youtube.com',
+        'player.vimeo.com',
+        'embed.ted.com',
+        'www.instagram.com',
+      ]);
+
+      const toAbsoluteUrl = (value?: string | null) => {
+        if (!value) return '';
+        const trimmed = value.trim();
+        if (!trimmed) return '';
+        if (/^javascript:/i.test(trimmed)) {
+          return '';
+        }
+        if (/^(data:|mailto:|tel:)/i.test(trimmed)) {
+          return trimmed;
+        }
+
+        const base = options?.baseUrl || window.location.origin;
+
+        try {
+          return new URL(trimmed, base).toString();
+        } catch (error) {
+          return trimmed;
+        }
+      };
+
+      const convertSrcset = (value?: string | null) => {
+        if (!value) return '';
+
+        const sources = value
+          .split(',')
+          .map((entry) => entry.trim())
+          .filter(Boolean)
+          .map((entry) => {
+            const [url, descriptor] = entry.split(/\s+/, 2);
+            const absolute = toAbsoluteUrl(url);
+            if (!absolute) {
+              return '';
+            }
+            return descriptor ? `${absolute} ${descriptor}` : absolute;
+          })
+          .filter(Boolean);
+
+        return sources.join(', ');
+      };
 
       const stripBackground = (element: HTMLElement) => {
         if (element.hasAttribute('bgcolor')) {
@@ -231,17 +288,161 @@ export default function Home() {
         }
       };
 
-      elements.forEach(stripBackground);
-      if (wrapper) {
-        stripBackground(wrapper);
-        return wrapper.innerHTML;
-      }
+      const processElement = (element: HTMLElement) => {
+        stripBackground(element);
 
-      stripBackground(doc.body as HTMLElement);
-      return doc.body.innerHTML;
+        Array.from(element.attributes).forEach((attr) => {
+          const name = attr.name.toLowerCase();
+          const value = attr.value;
+
+          if (name.startsWith('on')) {
+            element.removeAttribute(attr.name);
+            return;
+          }
+
+          if (name === 'style') {
+            return;
+          }
+
+          if (name === 'href' || name === 'poster') {
+            const absolute = toAbsoluteUrl(value);
+            if (absolute) {
+              element.setAttribute(attr.name, absolute);
+            } else {
+              element.removeAttribute(attr.name);
+            }
+            return;
+          }
+
+          if (name === 'src') {
+            const absolute = toAbsoluteUrl(value);
+            if (absolute) {
+              element.setAttribute('src', absolute);
+            } else {
+              element.removeAttribute('src');
+            }
+            return;
+          }
+
+          if (name === 'data-src') {
+            const absolute = toAbsoluteUrl(value);
+            if (absolute) {
+              element.setAttribute('src', absolute);
+            }
+            element.removeAttribute(attr.name);
+            return;
+          }
+
+          if (name === 'srcset') {
+            const absoluteSet = convertSrcset(value);
+            if (absoluteSet) {
+              element.setAttribute('srcset', absoluteSet);
+            } else {
+              element.removeAttribute('srcset');
+            }
+            return;
+          }
+
+          if (name === 'data-srcset') {
+            const absoluteSet = convertSrcset(value);
+            if (absoluteSet) {
+              element.setAttribute('srcset', absoluteSet);
+            }
+            element.removeAttribute(attr.name);
+          }
+        });
+
+        if (element.tagName.toLowerCase() === 'iframe') {
+          const src = element.getAttribute('src');
+          if (!src) {
+            element.remove();
+            return;
+          }
+
+          try {
+            const iframeUrl = new URL(src);
+            if (!allowedIframeHosts.has(iframeUrl.hostname)) {
+              const anchor = doc.createElement('a');
+              anchor.href = src;
+              anchor.textContent = src;
+              anchor.target = '_blank';
+              anchor.rel = 'noopener noreferrer';
+              element.replaceWith(anchor);
+              return;
+            }
+            element.setAttribute('allowfullscreen', 'true');
+          } catch (error) {
+            element.remove();
+          }
+        }
+
+        if (element.tagName.toLowerCase() === 'a') {
+          const href = element.getAttribute('href');
+          if (href) {
+            element.setAttribute('target', '_blank');
+            element.setAttribute('rel', 'noopener noreferrer');
+          }
+        }
+      };
+
+      processElement(root);
+      root.querySelectorAll<HTMLElement>('*').forEach(processElement);
+
+      return wrapper ? wrapper.innerHTML : doc.body.innerHTML;
     } catch (error) {
       console.error('Failed to sanitize HTML background styles:', error);
       return html;
+    }
+  };
+
+  const handleImportFromUrl = async () => {
+    const trimmedUrl = importUrl.trim();
+
+    if (!trimmedUrl) {
+      setImportError('가져올 URL을 입력하세요.');
+      return;
+    }
+
+    if (!editorRef.current) {
+      setImportError('에디터가 준비되지 않았습니다. 잠시 후 다시 시도해주세요.');
+      return;
+    }
+
+    setIsImporting(true);
+    setImportError('');
+
+    try {
+      const response = await fetch('/api/fetch-article', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url: trimmedUrl }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || '페이지를 불러오지 못했습니다.');
+      }
+
+      const cleanedHtml = sanitizeHtmlForDarkMode(data.html, {
+        baseUrl: data.baseUrl,
+      });
+
+      const blocks = editorRef.current.tryParseHTMLToBlocks(cleanedHtml);
+      editorRef.current.replaceBlocks(editorRef.current.document, blocks);
+
+      if (data.title && !postTitle) {
+        setPostTitle(data.title);
+      }
+    } catch (error) {
+      console.error('Import error:', error);
+      setImportError(
+        error instanceof Error ? error.message : '페이지를 불러오지 못했습니다.'
+      );
+    } finally {
+      setIsImporting(false);
     }
   };
 
@@ -579,6 +780,61 @@ export default function Home() {
                   </>
                 )}
               </button>
+            </div>
+            <div className="container max-w-7xl mt-3">
+              <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-2 md:flex-row md:items-center">
+                  <label className="text-sm font-medium text-foreground whitespace-nowrap flex items-center gap-2">
+                    <Link2 className="w-4 h-4" /> 원본 URL
+                  </label>
+                  <div className="flex flex-1 gap-2">
+                    <input
+                      type="url"
+                      value={importUrl}
+                      onChange={(event) => {
+                        setImportUrl(event.target.value);
+                        if (importError) {
+                          setImportError('');
+                        }
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          event.preventDefault();
+                          if (!isImporting) {
+                            handleImportFromUrl();
+                          }
+                        }
+                      }}
+                      placeholder="https://example.com/article"
+                      className="flex-1 px-3 py-2 border border-input bg-background rounded-md focus:outline-none focus:ring-2 focus:ring-ring text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleImportFromUrl}
+                      disabled={isImporting}
+                      className="px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm whitespace-nowrap font-medium"
+                    >
+                      {isImporting ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          불러오는 중
+                        </>
+                      ) : (
+                        <>불러오기</>
+                      )}
+                    </button>
+                  </div>
+                </div>
+                {importError ? (
+                  <p className="text-sm text-destructive">{importError}</p>
+                ) : (
+                  importUrl && (
+                    <p className="text-xs text-muted-foreground">
+                      URL을 입력하면 이미지·비디오를 포함해 원본 페이지와 유사한 형태로 에디터에 로드됩니다.
+                    </p>
+                  )
+                )}
+              </div>
             </div>
           </div>
 
