@@ -10,6 +10,11 @@ export async function GET(request: NextRequest) {
     const sessionCookie = request.cookies.get(SESSION_COOKIE_NAME)?.value;
     const authenticated = isValidSession(sessionCookie);
 
+    console.log('[auth/session] cookie', {
+      hasCookie: Boolean(sessionCookie),
+      authenticated,
+    });
+
     return NextResponse.json({
       authenticated,
       user: authenticated ? getAuthenticatedUser() : null,
