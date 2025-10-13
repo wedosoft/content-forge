@@ -11,9 +11,14 @@ export async function POST(request: NextRequest) {
   try {
     const { email, password } = await request.json();
 
+    const passwordIsString = typeof password === 'string';
+    const trimmedPassword = passwordIsString ? password.trim() : '';
+
     console.log('[auth/login] attempt', {
       email,
-      hasPassword: typeof password === 'string' && password.length > 0,
+      hasPassword: passwordIsString && password.length > 0,
+      rawPasswordLength: passwordIsString ? password.length : undefined,
+      trimmedPasswordLength: trimmedPassword.length,
     });
 
     if (!email || !password) {
