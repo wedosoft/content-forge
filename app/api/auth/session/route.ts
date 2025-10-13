@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
+import {
+  getAuthenticatedUser,
+  isValidSession,
+  SESSION_COOKIE_NAME,
+} from '@/lib/simple-auth';
 
 export async function GET(request: NextRequest) {
   try {
-    // 클라이언트 측에서 세션을 관리하므로 여기서는 성공 응답만 반환
+    const sessionCookie = request.cookies.get(SESSION_COOKIE_NAME)?.value;
+    const authenticated = isValidSession(sessionCookie);
+
     return NextResponse.json({
-      success: true,
+      authenticated,
+      user: authenticated ? getAuthenticatedUser() : null,
     });
   } catch (error) {
     console.error('Session check error:', error);

@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import ChatInterface from '../components/ChatInterface';
-import { supabaseBlog, supabaseAuth, BlogCategory } from '../lib/supabase';
+import { supabaseBlog, BlogCategory } from '../lib/supabase';
 import { Loader2, Send, Search, Edit2, Trash2, LogOut } from 'lucide-react';
 
 // BlockNote AI 에디터를 동적으로 로드 (SSR 방지)
@@ -30,7 +30,7 @@ export default function Home() {
 
   // 인증 상태
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<{ email: string } | null>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
   // 포스팅 상태
@@ -48,32 +48,58 @@ export default function Home() {
 
   // 인증 상태 확인
   useEffect(() => {
+    let isMounted = true;
+
     const checkAuth = async () => {
-      const { data: { session } } = await supabaseAuth.auth.getSession();
-      if (session) {
-        setIsAuthenticated(true);
-        setCurrentUser(session.user);
-      } else {
-        router.push('/login');
+      try {
+        const response = await fetch('/api/auth/session');
+
+        if (!response.ok) {
+          throw new Error('세션 확인에 실패했습니다.');
+        }
+
+        const data = await response.json();
+
+        if (!isMounted) {
+          return;
+        }
+
+        if (data.authenticated) {
+          setIsAuthenticated(true);
+          setCurrentUser(data.user);
+        } else {
+          setIsAuthenticated(false);
+          setCurrentUser(null);
+          router.replace('/login');
+        }
+      } catch (error) {
+        console.error('Failed to check auth:', error);
+        if (isMounted) {
+          setIsAuthenticated(false);
+          setCurrentUser(null);
+          router.replace('/login');
+        }
+      } finally {
+        if (isMounted) {
+          setIsCheckingAuth(false);
+        }
       }
-      setIsCheckingAuth(false);
     };
 
     checkAuth();
 
-    // 인증 상태 변경 감지
-    const { data: { subscription } } = supabaseAuth.auth.onAuthStateChange((_event, session) => {
-      if (session) {
-        setIsAuthenticated(true);
-        setCurrentUser(session.user);
-      } else {
-        setIsAuthenticated(false);
-        setCurrentUser(null);
-        router.push('/login');
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        checkAuth();
       }
-    });
+    };
 
-    return () => subscription.unsubscribe();
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      isMounted = false;
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [router]);
 
   // 카테고리 가져오기
@@ -135,11 +161,15 @@ export default function Home() {
 
   // 로그아웃 핸들러
   const handleLogout = async () => {
-    await supabaseAuth.auth.signOut();
-    await fetch('/api/auth/logout', { method: 'POST' });
-    setIsAuthenticated(false);
-    setCurrentUser(null);
-    router.push('/login');
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      setIsAuthenticated(false);
+      setCurrentUser(null);
+      router.push('/login');
+    }
   };
 
   // 인증 확인 중에는 로딩 표시
@@ -149,6 +179,10 @@ export default function Home() {
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
+  }
+
+  if (!isAuthenticated) {
+    return null;
   }
 
   // 포스트 발행

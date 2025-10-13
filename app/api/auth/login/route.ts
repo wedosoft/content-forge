@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+import {
+  getAuthenticatedUser,
+  SESSION_COOKIE_NAME,
+  SESSION_MAX_AGE,
+  SESSION_TOKEN,
+  validateCredentials,
+} from '@/lib/simple-auth';
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,30 +18,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        persistSession: false,
-      }
-    });
-
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (error) {
+    if (!validateCredentials(email, password)) {
       return NextResponse.json(
         { error: '이메일 또는 비밀번호가 올바르지 않습니다.' },
         { status: 401 }
       );
     }
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       message: '로그인되었습니다.',
-      session: data.session,
-      user: data.user,
+      user: getAuthenticatedUser(),
     });
+
+    response.cookies.set({
+      name: SESSION_COOKIE_NAME,
+      value: SESSION_TOKEN,
+      maxAge: SESSION_MAX_AGE,
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      path: '/',
+    });
+
+    return response;
   } catch (error) {
     console.error('Login error:', error);
     return NextResponse.json(
