@@ -25,7 +25,8 @@ interface BlogPost {
 
 export default function Home() {
   const router = useRouter();
-  const editorRef = useRef<any>(null);
+  const createEditorRef = useRef<any>(null);
+  const manageEditorRef = useRef<any>(null);
   const [activeTab, setActiveTab] = useState<'create' | 'manage'>('create');
 
   // 인증 상태
@@ -403,7 +404,7 @@ export default function Home() {
       return;
     }
 
-    if (!editorRef.current) {
+    if (!createEditorRef.current) {
       setImportError('에디터가 준비되지 않았습니다. 잠시 후 다시 시도해주세요.');
       return;
     }
@@ -430,8 +431,8 @@ export default function Home() {
         baseUrl: data.baseUrl,
       });
 
-      const blocks = editorRef.current.tryParseHTMLToBlocks(cleanedHtml);
-      editorRef.current.replaceBlocks(editorRef.current.document, blocks);
+      const blocks = createEditorRef.current.tryParseHTMLToBlocks(cleanedHtml);
+      createEditorRef.current.replaceBlocks(createEditorRef.current.document, blocks);
 
       if (data.title && !postTitle) {
         setPostTitle(data.title);
@@ -458,7 +459,7 @@ export default function Home() {
       return;
     }
 
-    if (!editorRef.current) {
+    if (!createEditorRef.current) {
       alert('에디터가 준비되지 않았습니다');
       return;
     }
@@ -466,8 +467,8 @@ export default function Home() {
     setIsPublishing(true);
 
     try {
-      const blocks = editorRef.current.document;
-      const rawHtml = editorRef.current.blocksToHTMLLossy(blocks);
+      const blocks = createEditorRef.current.document;
+      const rawHtml = createEditorRef.current.blocksToHTMLLossy(blocks);
       const htmlContent = sanitizeHtmlForDarkMode(rawHtml);
 
       const response = await fetch('/api/publish-blog', {
@@ -493,8 +494,8 @@ export default function Home() {
       // 초기화
       setPostTitle('');
       setSelectedCategory('');
-      if (editorRef.current?.replaceBlocks) {
-        editorRef.current.replaceBlocks(editorRef.current.document, [
+      if (createEditorRef.current?.replaceBlocks) {
+        createEditorRef.current.replaceBlocks(createEditorRef.current.document, [
           { type: 'paragraph', content: '' }
         ]);
       }
@@ -520,20 +521,20 @@ export default function Home() {
 
       // 에디터가 마운트될 때까지 대기 후 HTML을 에디터에 로드
       setTimeout(() => {
-        if (editorRef.current && data.post.content_html) {
+        if (manageEditorRef.current && data.post.content_html) {
           console.log('Loading content to editor:', data.post.content_html.substring(0, 100));
           try {
             const cleanedHtml = sanitizeHtmlForDarkMode(data.post.content_html);
-            const blocks = editorRef.current.tryParseHTMLToBlocks(cleanedHtml);
+            const blocks = manageEditorRef.current.tryParseHTMLToBlocks(cleanedHtml);
             console.log('Parsed blocks:', blocks);
-            editorRef.current.replaceBlocks(editorRef.current.document, blocks);
+            manageEditorRef.current.replaceBlocks(manageEditorRef.current.document, blocks);
             console.log('Content loaded successfully');
           } catch (err) {
             console.error('Error loading content to editor:', err);
           }
         } else {
           console.error('Editor ref not available or no content:', {
-            hasRef: !!editorRef.current,
+            hasRef: !!manageEditorRef.current,
             hasContent: !!data.post.content_html
           });
         }
@@ -553,7 +554,7 @@ export default function Home() {
       return;
     }
 
-    if (!editorRef.current) {
+    if (!manageEditorRef.current) {
       alert('에디터가 준비되지 않았습니다');
       return;
     }
@@ -561,8 +562,8 @@ export default function Home() {
     setIsUpdating(true);
 
     try {
-      const blocks = editorRef.current.document;
-      const rawHtml = editorRef.current.blocksToHTMLLossy(blocks);
+      const blocks = manageEditorRef.current.document;
+      const rawHtml = manageEditorRef.current.blocksToHTMLLossy(blocks);
       const htmlContent = sanitizeHtmlForDarkMode(rawHtml);
 
       const response = await fetch(`/api/posts/${editingPostId}`, {
@@ -589,8 +590,8 @@ export default function Home() {
       setEditingPostId(null);
       setPostTitle('');
       setSelectedCategory('');
-      if (editorRef.current?.replaceBlocks) {
-        editorRef.current.replaceBlocks(editorRef.current.document, [
+      if (manageEditorRef.current?.replaceBlocks) {
+        manageEditorRef.current.replaceBlocks(manageEditorRef.current.document, [
           { type: 'paragraph', content: '' }
         ]);
       }
@@ -635,8 +636,8 @@ export default function Home() {
     setEditingPostId(null);
     setPostTitle('');
     setSelectedCategory('');
-    if (editorRef.current?.replaceBlocks) {
-      editorRef.current.replaceBlocks(editorRef.current.document, [
+    if (manageEditorRef.current?.replaceBlocks) {
+      manageEditorRef.current.replaceBlocks(manageEditorRef.current.document, [
         { type: 'paragraph', content: '' }
       ]);
     }
@@ -698,8 +699,8 @@ export default function Home() {
               setEditingPostId(null);
               setPostTitle('');
               setSelectedCategory('');
-              if (editorRef.current?.replaceBlocks) {
-                editorRef.current.replaceBlocks(editorRef.current.document, [
+              if (createEditorRef.current?.replaceBlocks) {
+                createEditorRef.current.replaceBlocks(createEditorRef.current.document, [
                   { type: 'paragraph', content: '' }
                 ]);
               }
@@ -843,14 +844,14 @@ export default function Home() {
             <div className="container max-w-7xl w-full flex py-4 gap-4">
               {/* 채팅 영역 (왼쪽) */}
               <div className="w-80 flex-shrink-0">
-                <ChatInterface editorRef={editorRef} />
+                <ChatInterface editorRef={createEditorRef} />
               </div>
 
               {/* 에디터 영역 (오른쪽) */}
               <div className="flex-1 overflow-auto">
                 <div className="h-full">
                   <div className="bg-card rounded-lg shadow-sm border h-full p-4">
-                    <BlockNoteEditorWithAI editorRef={editorRef} />
+                    <BlockNoteEditorWithAI editorRef={createEditorRef} />
                   </div>
                 </div>
               </div>
@@ -993,7 +994,7 @@ export default function Home() {
                 <div className="flex-1 p-6 overflow-auto">
                   <div className="max-w-4xl mx-auto h-full">
                     <div className="bg-white rounded-lg shadow-sm border h-full p-4">
-                      <BlockNoteEditorWithAI editorRef={editorRef} />
+                      <BlockNoteEditorWithAI editorRef={manageEditorRef} />
                     </div>
                   </div>
                 </div>
